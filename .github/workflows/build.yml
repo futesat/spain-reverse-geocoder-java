@@ -2,9 +2,9 @@ name: Build & Test
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [ main, main-java8, develop, develop-java8 ]
   pull_request:
-    branches: [ main, master ]
+    branches: [ main, main-java8, develop, develop-java8 ]
 
 permissions:
   contents: read
