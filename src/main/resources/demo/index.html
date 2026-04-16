@@ -200,11 +200,82 @@
         .leaflet-popup-tip {
             background: var(--card-bg) !important;
         }
+
+        /* Search UI */
+        .search-container {
+            position: relative;
+            width: 300px;
+        }
+
+        #search-input {
+            width: 100%;
+            background: var(--glass);
+            border: 1px solid var(--glass-border);
+            border-radius: 0.75rem;
+            padding: 0.5rem 1rem;
+            color: #fff;
+            font-family: inherit;
+            outline: none;
+            transition: all 0.2s;
+        }
+
+        #search-input:focus {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: var(--primary);
+            box-shadow: 0 0 0 4px var(--primary-glow);
+        }
+
+        .search-results {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: var(--card-bg);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-radius: 0.75rem;
+            margin-top: 0.5rem;
+            max-height: 300px;
+            overflow-y: auto;
+            z-index: 2000;
+            display: none;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+        }
+
+        .search-result-item {
+            padding: 0.75rem 1rem;
+            cursor: pointer;
+            transition: background 0.2s;
+            border-bottom: 1px solid var(--glass-border);
+        }
+
+        .search-result-item:last-child {
+            border-bottom: none;
+        }
+
+        .search-result-item:hover {
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .search-result-item .muni-name {
+            display: block;
+            font-weight: 600;
+            color: #fff;
+        }
+
+        .search-result-item .muni-prov {
+            font-size: 0.75rem;
+            color: var(--text-dim);
+        }
     </style>
 </head>
 <body>
     <header>
         <div class="logo">Spain Geocoder</div>
+        <div class="search-container">
+            <input type="text" id="search-input" placeholder="Search municipality..." autocomplete="off">
+            <div id="search-results" class="search-results"></div>
+        </div>
         <div class="badge">Offline Precise Reverse Geocoding</div>
     </header>
     <main>
@@ -258,11 +329,17 @@
         }).addTo(map);
 
         let marker = null;
+        let geoJsonLayer = null;
+        let searchTimeout = null;
+        const searchInput = document.getElementById('search-input');
+        const searchResults = document.getElementById('search-results');
 
         map.on('click', async (e) => {
             const { lat, lng } = e.latlng;
             
             if (marker) map.removeLayer(marker);
+            if (geoJsonLayer) map.removeLayer(geoJsonLayer);
+            
             marker = L.marker([lat, lng]).addTo(map);
 
             document.getElementById('welcome-card').style.display = 'none';
@@ -288,6 +365,12 @@
                     document.getElementById('res-municipality-id').textContent = data.municipality.id;
                     document.getElementById('res-province').innerHTML = `${data.province.name} <span class="id-badge">${data.province.id}</span>`;
                     document.getElementById('res-community').innerHTML = `${data.autonomousCommunity.name} <span class="id-badge">${data.autonomousCommunity.id}</span>`;
+                    
+                    if (data.geometry) {
+                        geoJsonLayer = L.geoJSON(data.geometry, {
+                            style: { color: '#3b82f6', weight: 2, fillOpacity: 0.2 }
+                        }).addTo(map);
+                    }
                 } else {
                     noResult.style.display = 'block';
                 }
@@ -298,6 +381,84 @@
                 noResult.querySelector('p').textContent = 'The demo server returned an error or is disconnected.';
             }
         });
+
+        searchInput.addEventListener('input', (e) => {
+            const query = e.target.value.trim();
+            clearTimeout(searchTimeout);
+            
+            if (query.length < 2) {
+                searchResults.style.display = 'none';
+                return;
+            }
+
+            searchTimeout = setTimeout(async () => {
+                try {
+                    const response = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
+                    const results = await response.json();
+                    
+                    if (results.length > 0) {
+                        searchResults.innerHTML = results.map(res => `
+                            <div class="search-result-item" data-json='${JSON.stringify(res).replace(/'/g, "&apos;")}'>
+                                <span class="muni-name">${res.municipality.name}</span>
+                                <span class="muni-prov">${res.province.name} (${res.province.id})</span>
+                            </div>
+                        `).join('');
+                        searchResults.style.display = 'block';
+                    } else {
+                        searchResults.style.display = 'none';
+                    }
+                } catch (err) {
+                    console.error('Search error:', err);
+                }
+            }, 300);
+        });
+
+        searchResults.addEventListener('click', (e) => {
+            const item = e.target.closest('.search-result-item');
+            if (item) {
+                const data = JSON.parse(item.dataset.json);
+                selectMunicipality(data);
+                searchResults.style.display = 'none';
+                searchInput.value = '';
+            }
+        });
+
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.search-container')) {
+                searchResults.style.display = 'none';
+            }
+        });
+
+        function selectMunicipality(data) {
+            if (geoJsonLayer) map.removeLayer(geoJsonLayer);
+            if (marker) map.removeLayer(marker);
+
+            geoJsonLayer = L.geoJSON(data.geometry, {
+                style: {
+                    color: '#3b82f6',
+                    weight: 2,
+                    fillColor: '#3b82f6',
+                    fillOpacity: 0.2
+                }
+            }).addTo(map);
+
+            const bounds = geoJsonLayer.getBounds();
+            const center = bounds.getCenter();
+            
+            marker = L.marker(center).addTo(map);
+            map.fitBounds(bounds, { padding: [50, 50], maxZoom: 14 });
+
+            document.getElementById('welcome-card').style.display = 'none';
+            document.getElementById('result-card').style.display = 'block';
+            document.getElementById('loading-state').style.display = 'none';
+            document.getElementById('result-content').style.display = 'block';
+            document.getElementById('no-result').style.display = 'none';
+
+            document.getElementById('res-municipality').textContent = data.municipality.name;
+            document.getElementById('res-municipality-id').textContent = data.municipality.id;
+            document.getElementById('res-province').innerHTML = `${data.province.name} <span class="id-badge">${data.province.id}</span>`;
+            document.getElementById('res-community').innerHTML = `${data.autonomousCommunity.name} <span class="id-badge">${data.autonomousCommunity.id}</span>`;
+        }
     </script>
 </body>
 </html>

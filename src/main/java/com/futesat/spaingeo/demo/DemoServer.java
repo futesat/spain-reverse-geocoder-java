@@ -12,6 +12,7 @@ import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Scanner;
 
@@ -31,6 +32,7 @@ public final class DemoServer {
         HttpServer server = HttpServer.create(new InetSocketAddress(port), 0);
         server.createContext("/", new StaticHandler());
         server.createContext("/api/reverse", new ApiHandler());
+        server.createContext("/api/search", new SearchHandler());
         server.setExecutor(java.util.concurrent.Executors.newCachedThreadPool());
         System.out.println("\n\u001B[1m\u001B[32mDemo Server started at http://localhost:" + port + "/\u001B[0m\n");
         server.start();
@@ -56,6 +58,41 @@ public final class DemoServer {
             exchange.sendResponseHeaders(200, content.length);
             try (OutputStream os = exchange.getResponseBody()) {
                 os.write(content);
+            }
+        }
+    }
+
+    private class SearchHandler implements HttpHandler {
+        @Override
+        public void handle(HttpExchange exchange) throws IOException {
+            Map<String, String> params = queryToMap(exchange.getRequestURI().getQuery());
+            String query = params.get("q");
+
+            if (query == null || query.trim().isEmpty()) {
+                sendError(exchange, 400, "Missing 'q' parameter");
+                return;
+            }
+            try {
+                List<ReverseGeocodeResult> results = spainGeo.searchByNameContains(query);
+                
+                StringBuilder sb = new StringBuilder("[");
+                for (int i = 0; i < results.size(); i++) {
+                    sb.append(results.get(i).toJson(true));
+                    if (i < results.size() - 1) sb.append(",");
+                }
+                sb.append("]");
+                
+                byte[] response = sb.toString().getBytes(StandardCharsets.UTF_8);
+                
+                exchange.getResponseHeaders().set("Content-Type", "application/json");
+                exchange.getResponseHeaders().set("Access-Control-Allow-Origin", "*");
+                exchange.sendResponseHeaders(200, response.length);
+                try (OutputStream os = exchange.getResponseBody()) {
+                    os.write(response);
+                }
+            } catch (Exception e) {
+                System.err.println("Search API Error: " + e.getMessage());
+                sendError(exchange, 500, "Internal error: " + e.getMessage());
             }
         }
     }
