@@ -5,14 +5,22 @@ import com.futesat.spaingeo.io.PropertyMappingLoader;
 import com.futesat.spaingeo.io.SpainCatalog;
 import com.futesat.spaingeo.model.ReverseGeocodeResult;
 
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 public final class Main {
+    private static final String RESET = "\u001B[0m";
+    private static final String GREEN = "\u001B[32m";
+    private static final String YELLOW = "\u001B[33m";
+    private static final String CYAN = "\u001B[36m";
+    private static final String BOLD = "\u001B[1m";
+
     private Main() {
     }
 
@@ -58,8 +66,14 @@ public final class Main {
                 case "list":
                     handleList(spainGeo, args, options);
                     break;
+                case "batch":
+                    handleBatch(spainGeo, options);
+                    break;
+                case "demo":
+                    handleDemo(spainGeo, options);
+                    break;
                 default:
-                    throw new IllegalArgumentException("Unsupported command: " + command + ". Use 'lookup', 'search', or 'list'.");
+                    throw new IllegalArgumentException("Unsupported command: " + command + ". Use 'lookup', 'search', 'list', 'batch', or 'demo'.");
             }
         } catch (Exception e) {
             System.err.println("ERROR: " + e.getMessage());
@@ -108,6 +122,56 @@ public final class Main {
             }
         }
         System.out.println("]");
+    }
+    private static void handleBatch(SpainGeo spainGeo, Map<String, String> options) throws java.io.IOException {
+        String inPath = options.get("--in");
+        if (inPath == null) throw new IllegalArgumentException("Missing required option: --in <path>");
+        
+        Path path = Paths.get(inPath);
+        if (!Files.exists(path)) throw new IllegalArgumentException("File not found: " + inPath);
+
+        System.out.println(BOLD + "Processing batch: " + YELLOW + inPath + RESET);
+        
+        try (Stream<String> lines = Files.lines(path)) {
+            List<String> results = lines
+                .filter(line -> !line.trim().isEmpty())
+                .map(line -> {
+                    String[] parts = line.split("[,; \t]");
+                    if (parts.length < 2) return null;
+                    try {
+                        double lat = Double.parseDouble(parts[0].trim());
+                        double lon = Double.parseDouble(parts[1].trim());
+                        ReverseGeocodeResult res = spainGeo.reverse(lat, lon);
+                        return res != null ? res.toJson() : null;
+                    } catch (NumberFormatException e) {
+                        return null;
+                    }
+                })
+                .filter(java.util.Objects::nonNull)
+                .collect(Collectors.toList());
+                
+            printList(results);
+            System.out.println(GREEN + "✓ Processed " + results.size() + " matches." + RESET);
+        }
+    }
+
+    private static void handleDemo(SpainGeo spainGeo, Map<String, String> options) throws java.io.IOException {
+        int port = 8080;
+        if (options.containsKey("--port")) {
+            port = Integer.parseInt(options.get("--port"));
+        }
+        com.futesat.spaingeo.demo.DemoServer server = new com.futesat.spaingeo.demo.DemoServer(spainGeo, port);
+        server.start();
+        
+        // Keep main thread alive
+        System.out.println(BOLD + CYAN + "Press Ctrl+C to stop the server." + RESET);
+        while (true) {
+            try {
+                Thread.sleep(1000);
+            } catch (InterruptedException e) {
+                break;
+            }
+        }
     }
 
     private static void handleList(SpainGeo spainGeo, String[] args, Map<String, String> options) {
@@ -185,27 +249,37 @@ public final class Main {
     }
 
     private static void printHelp() {
-        System.out.println("Spain Reverse Geocoder (offline, exact polygons)\n" +
+        System.out.println(CYAN + BOLD + "Spain Reverse Geocoder" + RESET + " (offline, exact polygons)\n" +
                 "\n" +
-                "Commands:\n" +
-                "  lookup    Reverse geocode a coordinate to a municipality\n" +
-                "  search    Search municipalities by name\n" +
+                BOLD + "Commands:" + RESET + "\n" +
+                "  " + GREEN + "lookup" + RESET + "    Reverse geocode a coordinate to a municipality\n" +
+                "  " + GREEN + "search" + RESET + "    Search municipalities by name\n" +
+                "  " + GREEN + "list" + RESET + "      List administrative divisions\n" +
+                "  " + GREEN + "batch" + RESET + "     Bulk reverse geocode from a CSV/text file\n" +
+                "  " + GREEN + "demo" + RESET + "      Launch interactive web demo\n" +
                 "\n" +
-                "Lookup usage:\n" +
+                BOLD + "Lookup usage:" + RESET + "\n" +
                 "  java -jar spain-reverse-geocoder.jar lookup --lat <lat> --lon <lon>\n" +
                 "\n" +
-                "List usage:\n" +
+                BOLD + "List usage:" + RESET + "\n" +
                 "  java -jar spain-reverse-geocoder.jar list communities\n" +
                 "  java -jar spain-reverse-geocoder.jar list provinces [--community <id>]\n" +
                 "  java -jar spain-reverse-geocoder.jar list municipalities --province <id> [--geometry]\n" +
                 "  java -jar spain-reverse-geocoder.jar list municipalities --community <id> [--geometry]\n" +
                 "\n" +
-                "Search usage:\n" +
+                BOLD + "Search usage:" + RESET + "\n" +
                 "  java -jar spain-reverse-geocoder.jar search --name <query>\n" +
                 "  java -jar spain-reverse-geocoder.jar search --name <query> --partial\n" +
                 "  java -jar spain-reverse-geocoder.jar search --province <province> --name <query>\n" +
                 "\n" +
-                "Common options:\n" +
+                BOLD + "Batch usage:" + RESET + "\n" +
+                "  java -jar spain-reverse-geocoder.jar batch --in <input.csv>\n" +
+                "  " + YELLOW + "(Input format: lat,lon per line)" + RESET + "\n" +
+                "\n" +
+                BOLD + "Demo usage:" + RESET + "\n" +
+                "  java -jar spain-reverse-geocoder.jar demo [--port 8080]\n" +
+                "\n" +
+                BOLD + "Common options:" + RESET + "\n" +
                 "  --geojson <path>     Path to GeoJSON file (optional, uses embedded default)\n" +
                 "  --provinces <ids>    Comma-separated province codes to filter (e.g. 28,08)\n" +
                 "  --mapping <path>     Path to property mapping JSON\n" +

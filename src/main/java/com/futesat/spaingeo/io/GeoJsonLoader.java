@@ -9,7 +9,10 @@ import com.futesat.spaingeo.geo.Ring;
 import com.futesat.spaingeo.model.AdminDivision;
 import com.futesat.spaingeo.model.ReverseGeocodeResult;
 
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.Reader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -27,40 +30,25 @@ public final class GeoJsonLoader {
     }
 
     public static List<MunicipalityFeature> load(Path geoJsonPath, PropertyMapping mapping, SpainCatalog catalog, java.util.Set<String> provinceFilter) {
-        try {
-            byte[] bytes = Files.readAllBytes(geoJsonPath);
-            String json = new String(bytes, StandardCharsets.UTF_8);
-            return loadFromJson(json, mapping, catalog, provinceFilter);
+        try (BufferedReader reader = Files.newBufferedReader(geoJsonPath, StandardCharsets.UTF_8)) {
+            return loadFromReader(reader, mapping, catalog, provinceFilter);
         } catch (IOException e) {
             throw new IllegalStateException("Failed to read GeoJSON: " + geoJsonPath, e);
         }
     }
 
     public static List<MunicipalityFeature> load(java.io.InputStream inputStream, PropertyMapping mapping, SpainCatalog catalog, java.util.Set<String> provinceFilter) {
-        try {
-            java.io.ByteArrayOutputStream result = new java.io.ByteArrayOutputStream();
-            byte[] buffer = new byte[8192];
-            int length;
-            while ((length = inputStream.read(buffer)) != -1) {
-                result.write(buffer, 0, length);
-            }
-            String json = result.toString("UTF-8");
-            return loadFromJson(json, mapping, catalog, provinceFilter);
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream, StandardCharsets.UTF_8))) {
+            return loadFromReader(reader, mapping, catalog, provinceFilter);
         } catch (IOException e) {
             throw new IllegalStateException("Failed to read GeoJSON from stream", e);
         }
     }
 
-    private static List<MunicipalityFeature> loadFromJson(String json, PropertyMapping mapping, SpainCatalog catalog, java.util.Set<String> provinceFilter) {
-        Map<String, Object> root = (Map<String, Object>) MiniJsonParser.parse(json);
-        String type = root.get("type").toString();
-        if (!"FeatureCollection".equals(type)) {
-            throw new IllegalArgumentException("GeoJSON root must be a FeatureCollection.");
-        }
-
-        List<Object> features = (List<Object>) root.get("features");
-        List<MunicipalityFeature> results = new ArrayList<>(features.size());
-        for (Object featureObject : features) {
+    private static List<MunicipalityFeature> loadFromReader(Reader reader, PropertyMapping mapping, SpainCatalog catalog, java.util.Set<String> provinceFilter) {
+        List<MunicipalityFeature> results = new ArrayList<>();
+        
+        MiniJsonParser.streamArray(reader, "features", featureObject -> {
             Map<String, Object> feature = (Map<String, Object>) featureObject;
             Map<String, Object> properties = (Map<String, Object>) feature.get("properties");
             if (properties == null) {
@@ -68,7 +56,7 @@ public final class GeoJsonLoader {
             }
             Map<String, Object> geometryObject = (Map<String, Object>) feature.get("geometry");
             if (geometryObject == null) {
-                continue;
+                return;
             }
 
             // Memory optimization: early exit if province filter is set
@@ -77,7 +65,7 @@ public final class GeoJsonLoader {
                 if (mId != null && mId.length() >= 2) {
                     String pId = mId.substring(0, 2);
                     if (!provinceFilter.contains(pId)) {
-                        continue;
+                        return;
                     }
                 }
             }
@@ -85,7 +73,12 @@ public final class GeoJsonLoader {
             Geometry geometry = parseGeometry(geometryObject);
             ReverseGeocodeResult result = parseResult(properties, mapping, catalog, geometry);
             results.add(new MunicipalityFeature(result, geometry, geometry.envelope()));
+        });
+        
+        if (results.isEmpty()) {
+             // We might want to check why, but it could just be a valid empty collection or filtered out
         }
+        
         return results;
     }
 
