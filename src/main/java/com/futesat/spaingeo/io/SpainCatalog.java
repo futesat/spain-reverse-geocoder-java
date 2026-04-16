@@ -5,9 +5,11 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @SuppressWarnings("unchecked")
 public final class SpainCatalog {
@@ -39,7 +41,7 @@ public final class SpainCatalog {
 
     public static SpainCatalog load(Path path) {
         try {
-            return fromJson(Files.readString(path, StandardCharsets.UTF_8));
+            return fromJson(new String(Files.readAllBytes(path), StandardCharsets.UTF_8));
         } catch (IOException e) {
             throw new IllegalStateException("Failed to read catalog: " + path, e);
         }
@@ -65,7 +67,7 @@ public final class SpainCatalog {
         return communityNames.entrySet().stream()
                 .map(e -> new com.futesat.spaingeo.model.AdminDivision(e.getKey(), e.getValue()))
                 .sorted(java.util.Comparator.comparing(com.futesat.spaingeo.model.AdminDivision::name))
-                .toList();
+                .collect(Collectors.toList());
     }
 
     public List<com.futesat.spaingeo.model.AdminDivision> listProvinces(String communityId) {
@@ -73,7 +75,7 @@ public final class SpainCatalog {
                 .filter(e -> communityId == null || communityId.equals(provinceToCommunity.get(e.getKey())))
                 .map(e -> new com.futesat.spaingeo.model.AdminDivision(e.getKey(), e.getValue()))
                 .sorted(java.util.Comparator.comparing(com.futesat.spaingeo.model.AdminDivision::name))
-                .toList();
+                .collect(Collectors.toList());
     }
     
     public List<com.futesat.spaingeo.model.AdminDivision> listProvinces() {
@@ -114,8 +116,8 @@ public final class SpainCatalog {
         if (value == null) {
             return null;
         }
-        if (value instanceof Number number) {
-            long longValue = number.longValue();
+        if (value instanceof Number) {
+            long longValue = ((Number) value).longValue();
             return String.format("%02d", longValue);
         }
         return value.toString();
@@ -124,37 +126,37 @@ public final class SpainCatalog {
     private static Map<String, String> buildProvinceToCommunityMap() {
         Map<String, String> map = new HashMap<>();
         // Andalucía
-        for (String province : List.of("04", "11", "14", "18", "21", "23", "29", "41"))
+        for (String province : Arrays.asList("04", "11", "14", "18", "21", "23", "29", "41"))
             map.put(province, "01");
         // Aragón
-        for (String province : List.of("22", "44", "50"))
+        for (String province : Arrays.asList("22", "44", "50"))
             map.put(province, "02");
         // Asturias
         map.put("33", "03");
         // Balears
         map.put("07", "04");
         // Canarias
-        for (String province : List.of("35", "38"))
+        for (String province : Arrays.asList("35", "38"))
             map.put(province, "05");
         // Cantabria
         map.put("39", "06");
         // Castilla y León
-        for (String province : List.of("05", "09", "24", "34", "37", "40", "42", "47", "49"))
+        for (String province : Arrays.asList("05", "09", "24", "34", "37", "40", "42", "47", "49"))
             map.put(province, "07");
         // Castilla - La Mancha
-        for (String province : List.of("02", "13", "16", "19", "45"))
+        for (String province : Arrays.asList("02", "13", "16", "19", "45"))
             map.put(province, "08");
         // Cataluña
-        for (String province : List.of("08", "17", "25", "43"))
+        for (String province : Arrays.asList("08", "17", "25", "43"))
             map.put(province, "09");
         // Comunitat Valenciana
-        for (String province : List.of("03", "12", "46"))
+        for (String province : Arrays.asList("03", "12", "46"))
             map.put(province, "10");
         // Extremadura
-        for (String province : List.of("06", "10"))
+        for (String province : Arrays.asList("06", "10"))
             map.put(province, "11");
         // Galicia
-        for (String province : List.of("15", "27", "32", "36"))
+        for (String province : Arrays.asList("15", "27", "32", "36"))
             map.put(province, "12");
         // Madrid
         map.put("28", "13");
@@ -163,7 +165,7 @@ public final class SpainCatalog {
         // Navarra
         map.put("31", "15");
         // País Vasco
-        for (String province : List.of("01", "20", "48"))
+        for (String province : Arrays.asList("01", "20", "48"))
             map.put(province, "16");
         // Rioja
         map.put("26", "17");

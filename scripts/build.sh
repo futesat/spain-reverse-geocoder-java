@@ -9,7 +9,7 @@ rm -rf "$BUILD_DIR"
 mkdir -p "$CLASSES_DIR"
 
 find "$ROOT/src/main/java" -name "*.java" > "$BUILD_DIR/sources.txt"
-javac -d "$CLASSES_DIR" @"$BUILD_DIR/sources.txt"
+javac -source 1.8 -target 1.8 -d "$CLASSES_DIR" @"$BUILD_DIR/sources.txt"
 
 if [ -d "$ROOT/src/main/resources" ]; then
   cp -R "$ROOT/src/main/resources/." "$CLASSES_DIR/"

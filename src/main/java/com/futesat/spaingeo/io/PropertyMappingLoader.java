@@ -14,7 +14,8 @@ public final class PropertyMappingLoader {
 
     public static PropertyMapping load(Path path) {
         try {
-            String json = Files.readString(path, StandardCharsets.UTF_8);
+            byte[] bytes = Files.readAllBytes(path);
+            String json = new String(bytes, StandardCharsets.UTF_8);
             Map<String, Object> root = (Map<String, Object>) MiniJsonParser.parse(json);
             return new PropertyMapping(
                     listOrSingle(root, "municipalityId", PropertyMapping.defaultMapping().municipalityIdCandidates()),
@@ -34,11 +35,13 @@ public final class PropertyMappingLoader {
         if (value == null) {
             return defaultValue;
         }
-        if (value instanceof String s) {
-            return List.of(s);
+        if (value instanceof String) {
+            String s = (String) value;
+            return java.util.Arrays.asList(s);
         }
-        if (value instanceof List<?> list) {
-            return list.stream().map(Object::toString).toList();
+        if (value instanceof List) {
+            List<Object> list = (List<Object>) value;
+            return list.stream().map(Object::toString).collect(java.util.stream.Collectors.toList());
         }
         return defaultValue;
     }

@@ -12,6 +12,8 @@ import com.futesat.spaingeo.model.JsonEscaper;
 import com.futesat.spaingeo.model.ReverseGeocodeResult;
 
 import java.nio.file.Path;
+import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
@@ -236,7 +238,7 @@ public final class SelfTest {
                 Path.of("src/test/resources/sample_municipalities.geojson"),
                 PropertyMapping.defaultMapping(),
                 SpainCatalog.loadDefault(),
-                Set.of("28")
+                new HashSet<>(Arrays.asList("28"))
         );
         // Only Madrid province municipalities should be loaded (28079, 28065, 28006)
         assertEquals(3, features.size(), "Province filter 28 loads 3 municipalities");
@@ -247,7 +249,7 @@ public final class SelfTest {
                 Path.of("src/test/resources/sample_municipalities.geojson"),
                 PropertyMapping.defaultMapping(),
                 SpainCatalog.loadDefault(),
-                Set.of("28")
+                new HashSet<>(Arrays.asList("28"))
         );
         SpainReverseGeocoder geocoder = new SpainReverseGeocoder(features);
         // Barcelona should not be found when only Madrid province is loaded

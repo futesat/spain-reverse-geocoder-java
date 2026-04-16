@@ -28,7 +28,8 @@ public final class GeoJsonLoader {
 
     public static List<MunicipalityFeature> load(Path geoJsonPath, PropertyMapping mapping, SpainCatalog catalog, java.util.Set<String> provinceFilter) {
         try {
-            String json = Files.readString(geoJsonPath, StandardCharsets.UTF_8);
+            byte[] bytes = Files.readAllBytes(geoJsonPath);
+            String json = new String(bytes, StandardCharsets.UTF_8);
             return loadFromJson(json, mapping, catalog, provinceFilter);
         } catch (IOException e) {
             throw new IllegalStateException("Failed to read GeoJSON: " + geoJsonPath, e);
@@ -37,7 +38,13 @@ public final class GeoJsonLoader {
 
     public static List<MunicipalityFeature> load(java.io.InputStream inputStream, PropertyMapping mapping, SpainCatalog catalog, java.util.Set<String> provinceFilter) {
         try {
-            String json = new String(inputStream.readAllBytes(), StandardCharsets.UTF_8);
+            java.io.ByteArrayOutputStream result = new java.io.ByteArrayOutputStream();
+            byte[] buffer = new byte[8192];
+            int length;
+            while ((length = inputStream.read(buffer)) != -1) {
+                result.write(buffer, 0, length);
+            }
+            String json = result.toString("UTF-8");
             return loadFromJson(json, mapping, catalog, provinceFilter);
         } catch (IOException e) {
             throw new IllegalStateException("Failed to read GeoJSON from stream", e);
@@ -55,7 +62,10 @@ public final class GeoJsonLoader {
         List<MunicipalityFeature> results = new ArrayList<>(features.size());
         for (Object featureObject : features) {
             Map<String, Object> feature = (Map<String, Object>) featureObject;
-            Map<String, Object> properties = (Map<String, Object>) feature.getOrDefault("properties", Map.of());
+            Map<String, Object> properties = (Map<String, Object>) feature.get("properties");
+            if (properties == null) {
+                properties = java.util.Collections.emptyMap();
+            }
             Map<String, Object> geometryObject = (Map<String, Object>) feature.get("geometry");
             if (geometryObject == null) {
                 continue;
@@ -82,14 +92,14 @@ public final class GeoJsonLoader {
     private static ReverseGeocodeResult parseResult(Map<String, Object> properties, PropertyMapping mapping, SpainCatalog catalog, Geometry geometry) {
         String municipalityId = normalizeMunicipalityId(readFirst(properties, mapping.municipalityIdCandidates()));
         String municipalityName = readFirst(properties, mapping.municipalityNameCandidates());
-        if ((municipalityName == null || municipalityName.isBlank()) && municipalityId != null) {
+        if ((municipalityName == null || municipalityName.trim().isEmpty()) && municipalityId != null) {
             municipalityName = catalog.municipalityName(municipalityId);
         }
 
-        if (municipalityId == null || municipalityId.isBlank()) {
+        if (municipalityId == null || municipalityId.trim().isEmpty()) {
             throw new IllegalArgumentException("Feature is missing a municipality id.");
         }
-        if (municipalityName == null || municipalityName.isBlank()) {
+        if (municipalityName == null || municipalityName.trim().isEmpty()) {
             throw new IllegalArgumentException("Feature is missing a municipality name.");
         }
 
@@ -99,7 +109,7 @@ public final class GeoJsonLoader {
         }
 
         String provinceName = readFirst(properties, mapping.provinceNameCandidates());
-        if ((provinceName == null || provinceName.isBlank()) && provinceId != null) {
+        if ((provinceName == null || provinceName.trim().isEmpty()) && provinceId != null) {
             provinceName = catalog.provinceName(provinceId);
         }
 
@@ -109,7 +119,7 @@ public final class GeoJsonLoader {
         }
 
         String communityName = readFirst(properties, mapping.autonomousCommunityNameCandidates());
-        if ((communityName == null || communityName.isBlank()) && communityId != null) {
+        if ((communityName == null || communityName.trim().isEmpty()) && communityId != null) {
             communityName = catalog.communityName(communityId);
         }
 
@@ -132,8 +142,8 @@ public final class GeoJsonLoader {
         for (String key : candidates) {
             Object value = properties.get(key);
             if (value != null) {
-                if (value instanceof Number number) {
-                    long longValue = number.longValue();
+                if (value instanceof Number) {
+                    long longValue = ((Number) value).longValue();
                     return Long.toString(longValue);
                 }
                 return value.toString();
@@ -170,11 +180,14 @@ public final class GeoJsonLoader {
     private static Geometry parseGeometry(Map<String, Object> geometry) {
         String type = geometry.get("type").toString();
         Object coordinates = geometry.get("coordinates");
-        return switch (type) {
-            case "Polygon" -> parsePolygon((List<Object>) coordinates);
-            case "MultiPolygon" -> parseMultiPolygon((List<Object>) coordinates);
-            default -> throw new IllegalArgumentException("Unsupported geometry type: " + type);
-        };
+        switch (type) {
+            case "Polygon":
+                return parsePolygon((List<Object>) coordinates);
+            case "MultiPolygon":
+                return parseMultiPolygon((List<Object>) coordinates);
+            default:
+                throw new IllegalArgumentException("Unsupported geometry type: " + type);
+        }
     }
 
     private static PolygonGeometry parsePolygon(List<Object> polygonCoordinates) {
@@ -212,8 +225,8 @@ public final class GeoJsonLoader {
     }
 
     private static double asDouble(Object value) {
-        if (value instanceof Number n) {
-            return n.doubleValue();
+        if (value instanceof Number) {
+            return ((Number) value).doubleValue();
         }
         return Double.parseDouble(value.toString());
     }

@@ -1,7 +1,7 @@
 # 🇪🇸 Spain Reverse Geocoder
 
 [![Build & Test](https://github.com/futesat/spain-reverse-geocoder-java/actions/workflows/build.yml/badge.svg)](https://github.com/futesat/spain-reverse-geocoder-java/actions/workflows/build.yml)
-![Java 21](https://img.shields.io/badge/Java-21-blue)
+![Java 8](https://img.shields.io/badge/Java-8-blue)
 ![No Dependencies](https://img.shields.io/badge/dependencies-none-brightgreen)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
@@ -24,7 +24,7 @@ Given coordinates → returns the **municipality**, **province**, **autonomous c
 | **CLI Tool** | Command-line interface for `lookup` and `search` operations |
 | **Geometry Output** | Returns the full municipality polygon as GeoJSON in results |
 | **Low Precision Mode** | Option to use ~75MB GeoJSON (vs ~90MB) to save memory/space |
-| **Zero Dependencies** | Pure Java 21 — no Maven, no Gradle, no external libraries |
+| **Zero Dependencies** | Pure Java 8 — no Maven, no Gradle, no external libraries |
 
 ---
 
@@ -61,7 +61,7 @@ java -jar spain-reverse-geocoder.jar search --name "Madrid"
 
 ## 📦 Build
 
-Requires **JDK 21+**. No build tools needed.
+Requires **JDK 8+**. No build tools needed.
 
 ```bash
 ./scripts/build.sh

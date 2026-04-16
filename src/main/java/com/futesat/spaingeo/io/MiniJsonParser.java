@@ -29,15 +29,15 @@ public final class MiniJsonParser {
             throw new IllegalArgumentException("Unexpected end of JSON.");
         }
         char c = peek();
-        return switch (c) {
-            case '{' -> parseObject();
-            case '[' -> parseArray();
-            case '"' -> parseString();
-            case 't' -> parseTrue();
-            case 'f' -> parseFalse();
-            case 'n' -> parseNull();
-            default -> parseNumber();
-        };
+        switch (c) {
+            case '{': return parseObject();
+            case '[': return parseArray();
+            case '"': return parseString();
+            case 't': return parseTrue();
+            case 'f': return parseFalse();
+            case 'n': return parseNull();
+            default: return parseNumber();
+        }
     }
 
     private Map<String, Object> parseObject() {
@@ -103,23 +103,23 @@ public final class MiniJsonParser {
                 }
                 char e = next();
                 switch (e) {
-                    case '"' -> sb.append('"');
-                    case '\\' -> sb.append('\\');
-                    case '/' -> sb.append('/');
-                    case 'b' -> sb.append('\b');
-                    case 'f' -> sb.append('\f');
-                    case 'n' -> sb.append('\n');
-                    case 'r' -> sb.append('\r');
-                    case 't' -> sb.append('\t');
-                    case 'u' -> {
+                    case '"': sb.append('"'); break;
+                    case '\\': sb.append('\\'); break;
+                    case '/': sb.append('/'); break;
+                    case 'b': sb.append('\b'); break;
+                    case 'f': sb.append('\f'); break;
+                    case 'n': sb.append('\n'); break;
+                    case 'r': sb.append('\r'); break;
+                    case 't': sb.append('\t'); break;
+                    case 'u': {
                         if (pos + 4 > input.length()) {
                             throw new IllegalArgumentException("Invalid unicode escape at position " + pos);
                         }
                         String hex = input.substring(pos, pos + 4);
                         sb.append((char) Integer.parseInt(hex, 16));
                         pos += 4;
-                    }
-                    default -> throw new IllegalArgumentException("Invalid escape character: " + e);
+                    } break;
+                    default: throw new IllegalArgumentException("Invalid escape character: " + e);
                 }
             } else {
                 sb.append(c);

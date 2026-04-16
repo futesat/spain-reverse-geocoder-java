@@ -6,6 +6,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * In-memory index for fast municipality name searching.
@@ -34,7 +35,7 @@ public final class MunicipalityIndex {
     public List<ReverseGeocodeResult> searchByName(String name) {
         String normalized = TextNormalizer.normalize(name);
         List<ReverseGeocodeResult> results = byNormalizedName.get(normalized);
-        return results != null ? List.copyOf(results) : List.of();
+        return results != null ? java.util.Collections.unmodifiableList(results) : java.util.Collections.emptyList();
     }
 
     /**
@@ -43,15 +44,15 @@ public final class MunicipalityIndex {
     public List<ReverseGeocodeResult> searchByNameContains(String query) {
         String normalizedQuery = TextNormalizer.normalize(query);
         if (normalizedQuery.isEmpty()) {
-            return List.of();
+            return java.util.Collections.emptyList();
         }
         List<ReverseGeocodeResult> matches = new ArrayList<>();
-        for (var entry : byNormalizedName.entrySet()) {
+        for (Map.Entry<String, List<ReverseGeocodeResult>> entry : byNormalizedName.entrySet()) {
             if (entry.getKey().contains(normalizedQuery)) {
                 matches.addAll(entry.getValue());
             }
         }
-        return List.copyOf(matches);
+        return java.util.Collections.unmodifiableList(matches);
     }
 
     /**
@@ -76,14 +77,14 @@ public final class MunicipalityIndex {
                 matches.add(result);
             }
         }
-        return List.copyOf(matches);
+        return java.util.Collections.unmodifiableList(matches);
     }
 
     public List<ReverseGeocodeResult> listByProvince(String provinceId) {
         return allResults.stream()
                 .filter(r -> r.province().id().equals(provinceId))
                 .sorted(java.util.Comparator.comparing(r -> r.municipality().name()))
-                .toList();
+                .collect(Collectors.toList());
     }
 
     public List<ReverseGeocodeResult> listByCommunity(String communityId) {
