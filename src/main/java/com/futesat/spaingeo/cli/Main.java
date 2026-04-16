@@ -6,6 +6,7 @@ import com.futesat.spaingeo.io.SpainCatalog;
 import com.futesat.spaingeo.model.ReverseGeocodeResult;
 
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -27,7 +28,7 @@ public final class Main {
             SpainGeo.Builder builder = SpainGeo.builder();
 
             if (options.containsKey("--geojson")) {
-                builder.geoJsonPath(Path.of(options.get("--geojson")));
+                builder.geoJsonPath(Paths.get(options.get("--geojson")));
             }
             if (options.containsKey("--provinces")) {
                 String[] codes = options.get("--provinces").split(",");
@@ -36,10 +37,10 @@ public final class Main {
                 }
             }
             if (options.containsKey("--mapping")) {
-                builder.mapping(PropertyMappingLoader.load(Path.of(options.get("--mapping"))));
+                builder.mapping(PropertyMappingLoader.load(Paths.get(options.get("--mapping"))));
             }
             if (options.containsKey("--catalog")) {
-                builder.catalog(SpainCatalog.load(Path.of(options.get("--catalog"))));
+                builder.catalog(SpainCatalog.load(Paths.get(options.get("--catalog"))));
             }
             if (options.containsKey("--low-precision")) {
                 builder.lowPrecision(true);

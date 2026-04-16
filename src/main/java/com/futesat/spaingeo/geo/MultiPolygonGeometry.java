@@ -10,7 +10,7 @@ public final class MultiPolygonGeometry implements Geometry {
         if (polygons == null || polygons.isEmpty()) {
             throw new IllegalArgumentException("A multipolygon needs at least one polygon.");
         }
-        this.polygons = List.copyOf(polygons);
+        this.polygons = java.util.Collections.unmodifiableList(new java.util.ArrayList<>(polygons));
         Envelope env = polygons.get(0).envelope();
         for (int i = 1; i < polygons.size(); i++) {
             env = env.expandToInclude(polygons.get(i).envelope());

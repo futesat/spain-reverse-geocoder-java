@@ -12,7 +12,7 @@ public final class Ring {
         if (coordinates == null || coordinates.size() < 4) {
             throw new IllegalArgumentException("A ring needs at least 4 coordinates.");
         }
-        this.coordinates = List.copyOf(coordinates);
+        this.coordinates = java.util.Collections.unmodifiableList(new java.util.ArrayList<>(coordinates));
         this.envelope = computeEnvelope(coordinates);
     }
 

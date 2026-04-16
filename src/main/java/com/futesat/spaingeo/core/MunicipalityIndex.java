@@ -91,7 +91,7 @@ public final class MunicipalityIndex {
         return allResults.stream()
                 .filter(r -> r.autonomousCommunity().id().equals(communityId))
                 .sorted(java.util.Comparator.comparing(r -> r.municipality().name()))
-                .toList();
+                .collect(Collectors.toList());
     }
 
     /**

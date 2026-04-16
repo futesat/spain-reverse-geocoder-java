@@ -9,7 +9,7 @@ public final class PolygonGeometry implements Geometry {
 
     public PolygonGeometry(Ring shell, List<Ring> holes) {
         this.shell = shell;
-        this.holes = List.copyOf(holes);
+        this.holes = java.util.Collections.unmodifiableList(new java.util.ArrayList<>(holes));
         this.envelope = shell.envelope();
     }
 

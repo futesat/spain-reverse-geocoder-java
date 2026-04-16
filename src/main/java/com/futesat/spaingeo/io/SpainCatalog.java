@@ -1,5 +1,7 @@
 package com.futesat.spaingeo.io;
 
+import java.io.ByteArrayOutputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -32,7 +34,8 @@ public final class SpainCatalog {
             if (in == null) {
                 throw new IllegalStateException("Resource spain_administrative_divisions.json was not found.");
             }
-            String json = new String(in.readAllBytes(), StandardCharsets.UTF_8);
+            byte[] bytes = readAllBytes(in);
+            String json = new String(bytes, StandardCharsets.UTF_8);
             return fromJson(json);
         } catch (IOException e) {
             throw new IllegalStateException("Failed to load built-in Spain catalog.", e);
@@ -174,5 +177,14 @@ public final class SpainCatalog {
         // Melilla
         map.put("52", "19");
         return map;
+    }
+    private static byte[] readAllBytes(InputStream in) throws IOException {
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        byte[] buffer = new byte[8192];
+        int n;
+        while ((n = in.read(buffer)) != -1) {
+            out.write(buffer, 0, n);
+        }
+        return out.toByteArray();
     }
 }
