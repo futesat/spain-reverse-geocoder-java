@@ -1,0 +1,119 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "municipalityId": "28079",
+        "municipalityName": "Madrid"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [-3.90, 40.20],
+            [-3.50, 40.20],
+            [-3.50, 40.60],
+            [-3.90, 40.60],
+            [-3.90, 40.20]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "municipalityId": "08019",
+        "municipalityName": "Barcelona"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [2.00, 41.20],
+            [2.30, 41.20],
+            [2.30, 41.50],
+            [2.00, 41.50],
+            [2.00, 41.20]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "municipalityId": "46250",
+        "municipalityName": "Valencia"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [-0.50, 39.30],
+            [-0.20, 39.30],
+            [-0.20, 39.60],
+            [-0.50, 39.60],
+            [-0.50, 39.30]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "municipalityId": "28065",
+        "municipalityName": "Getafe"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [-3.75, 40.28],
+            [-3.70, 40.28],
+            [-3.70, 40.33],
+            [-3.75, 40.33],
+            [-3.75, 40.28]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "municipalityId": "14021",
+        "municipalityName": "Córdoba"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [-5.00, 37.80],
+            [-4.60, 37.80],
+            [-4.60, 38.00],
+            [-5.00, 38.00],
+            [-5.00, 37.80]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "municipalityId": "28006",
+        "municipalityName": "Alcalá de Henares"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [-3.40, 40.45],
+            [-3.30, 40.45],
+            [-3.30, 40.55],
+            [-3.40, 40.55],
+            [-3.40, 40.45]
+          ]
+        ]
+      }
+    }
+  ]
+}

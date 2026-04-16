@@ -23,6 +23,7 @@ Given coordinates → returns the **municipality**, **province**, **autonomous c
 | **Library API** | Clean builder-pattern API for use as a dependency in other Java projects |
 | **CLI Tool** | Command-line interface for `lookup` and `search` operations |
 | **Geometry Output** | Returns the full municipality polygon as GeoJSON in results |
+| **Low Precision Mode** | Option to use ~75MB GeoJSON (vs ~90MB) to save memory/space |
 | **Zero Dependencies** | Pure Java 21 — no Maven, no Gradle, no external libraries |
 
 ---
@@ -87,6 +88,11 @@ SpainGeo geo = SpainGeo.builder()
 // Use your own GeoJSON file
 SpainGeo geo = SpainGeo.builder()
     .geoJsonPath(Path.of("/path/to/municipalities.geojson"))
+    .build();
+
+// Use low-precision mode (saves ~15MB JAR space and memory)
+SpainGeo geo = SpainGeo.builder()
+    .lowPrecision(true)
     .build();
 ```
 
@@ -178,6 +184,7 @@ java -jar spain-reverse-geocoder.jar search --province "Madrid" --name "Getafe"
 | `--provinces <codes>` | Comma-separated province codes to load (e.g. `28,08`) |
 | `--mapping <path>` | Path to property mapping JSON |
 | `--catalog <path>` | Path to administrative catalog JSON |
+| `--low-precision` | Use 4-decimal precision data (~75MB vs ~90MB) |
 
 ---
 
