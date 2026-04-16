@@ -79,6 +79,20 @@ public final class MunicipalityIndex {
         return List.copyOf(matches);
     }
 
+    public List<ReverseGeocodeResult> listByProvince(String provinceId) {
+        return allResults.stream()
+                .filter(r -> r.province().id().equals(provinceId))
+                .sorted(java.util.Comparator.comparing(r -> r.municipality().name()))
+                .toList();
+    }
+
+    public List<ReverseGeocodeResult> listByCommunity(String communityId) {
+        return allResults.stream()
+                .filter(r -> r.autonomousCommunity().id().equals(communityId))
+                .sorted(java.util.Comparator.comparing(r -> r.municipality().name()))
+                .toList();
+    }
+
     /**
      * Returns the total number of indexed municipalities.
      */

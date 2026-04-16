@@ -61,6 +61,25 @@ public final class SpainCatalog {
         return municipalityNames.get(municipalityId);
     }
 
+    public List<com.futesat.spaingeo.model.AdminDivision> listCommunities() {
+        return communityNames.entrySet().stream()
+                .map(e -> new com.futesat.spaingeo.model.AdminDivision(e.getKey(), e.getValue()))
+                .sorted(java.util.Comparator.comparing(com.futesat.spaingeo.model.AdminDivision::name))
+                .toList();
+    }
+
+    public List<com.futesat.spaingeo.model.AdminDivision> listProvinces(String communityId) {
+        return provinceNames.entrySet().stream()
+                .filter(e -> communityId == null || communityId.equals(provinceToCommunity.get(e.getKey())))
+                .map(e -> new com.futesat.spaingeo.model.AdminDivision(e.getKey(), e.getValue()))
+                .sorted(java.util.Comparator.comparing(com.futesat.spaingeo.model.AdminDivision::name))
+                .toList();
+    }
+    
+    public List<com.futesat.spaingeo.model.AdminDivision> listProvinces() {
+        return listProvinces(null);
+    }
+
     private static SpainCatalog fromJson(String json) {
         Object parsed = MiniJsonParser.parse(json);
         Map<String, Object> root = (Map<String, Object>) parsed;

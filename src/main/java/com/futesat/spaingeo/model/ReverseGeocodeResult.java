@@ -7,18 +7,23 @@ public record ReverseGeocodeResult(
         com.futesat.spaingeo.geo.Geometry geometry
 ) {
     public String toJson() {
+        return toJson(true);
+    }
+
+    public String toJson(boolean includeGeometry) {
+        String geometryJson = (includeGeometry && geometry != null) ? geometry.toJson() : "null";
         return """
                 {
-                  "municipality": { "id": "%s", "name": "%s" },
-                  "province": { "id": "%s", "name": "%s" },
-                  "autonomousCommunity": { "id": "%s", "name": "%s" },
+                  "municipality": %s,
+                  "province": %s,
+                  "autonomousCommunity": %s,
                   "geometry": %s
                 }
                 """.formatted(
-                JsonEscaper.escape(municipality.id()), JsonEscaper.escape(municipality.name()),
-                JsonEscaper.escape(province.id()), JsonEscaper.escape(province.name()),
-                JsonEscaper.escape(autonomousCommunity.id()), JsonEscaper.escape(autonomousCommunity.name()),
-                geometry.toJson()
+                municipality.toJson(),
+                province.toJson(),
+                autonomousCommunity.toJson(),
+                geometryJson
         );
     }
 }

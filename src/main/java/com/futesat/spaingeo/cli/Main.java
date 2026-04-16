@@ -21,8 +21,8 @@ public final class Main {
                 return;
             }
             String command = args[0];
-
-            Map<String, String> options = parseOptions(args);
+            int optionsStartIndex = command.equals("list") ? 2 : 1;
+            Map<String, String> options = parseOptions(args, optionsStartIndex);
             SpainGeo.Builder builder = SpainGeo.builder();
 
             if (options.containsKey("--geojson")) {
@@ -49,7 +49,8 @@ public final class Main {
             switch (command) {
                 case "lookup" -> handleLookup(spainGeo, options);
                 case "search" -> handleSearch(spainGeo, options);
-                default -> throw new IllegalArgumentException("Unsupported command: " + command + ". Use 'lookup' or 'search'.");
+                case "list" -> handleList(spainGeo, args, options);
+                default -> throw new IllegalArgumentException("Unsupported command: " + command + ". Use 'lookup', 'search', or 'list'.");
             }
         } catch (Exception e) {
             System.err.println("ERROR: " + e.getMessage());
@@ -100,15 +101,60 @@ public final class Main {
         System.out.println("]");
     }
 
-    private static Map<String, String> parseOptions(String[] args) {
+    private static void handleList(SpainGeo spainGeo, String[] args, Map<String, String> options) {
+        if (args.length < 2) {
+            throw new IllegalArgumentException("Missing subcommand for 'list'. Use 'communities', 'provinces', or 'municipalities'.");
+        }
+        String sub = args[1];
+        boolean geometry = options.containsKey("--geometry");
+
+        switch (sub) {
+            case "communities" -> {
+                printList(spainGeo.listCommunities().stream().map(com.futesat.spaingeo.model.AdminDivision::toJson).toList());
+            }
+            case "provinces" -> {
+                String communityId = options.get("--community");
+                printList(spainGeo.listProvinces(communityId).stream().map(com.futesat.spaingeo.model.AdminDivision::toJson).toList());
+            }
+            case "municipalities" -> {
+                String provinceId = options.get("--province");
+                String communityId = options.get("--community");
+                List<ReverseGeocodeResult> results;
+                if (provinceId != null) {
+                    results = spainGeo.listMunicipalitiesByProvince(provinceId);
+                } else if (communityId != null) {
+                    results = spainGeo.listMunicipalitiesByCommunity(communityId);
+                } else {
+                    throw new IllegalArgumentException("Missing --province or --community filter for 'list municipalities'.");
+                }
+                printList(results.stream().map(r -> r.toJson(geometry)).toList());
+            }
+            default -> throw new IllegalArgumentException("Unsupported list subcommand: " + sub);
+        }
+    }
+
+    private static void printList(List<String> items) {
+        System.out.println("[");
+        for (int i = 0; i < items.size(); i++) {
+            System.out.print(items.get(i));
+            if (i < items.size() - 1) {
+                System.out.println(",");
+            } else {
+                System.out.println();
+            }
+        }
+        System.out.println("]");
+    }
+
+    private static Map<String, String> parseOptions(String[] args, int startIndex) {
         Map<String, String> options = new HashMap<>();
-        for (int i = 1; i < args.length; i++) {
+        for (int i = startIndex; i < args.length; i++) {
             String arg = args[i];
             if (!arg.startsWith("--")) {
                 throw new IllegalArgumentException("Expected option starting with --, got: " + arg);
             }
             // Boolean flags (no value)
-            if ("--partial".equals(arg) || "--low-precision".equals(arg)) {
+            if ("--partial".equals(arg) || "--low-precision".equals(arg) || "--geometry".equals(arg)) {
                 options.put(arg, "true");
                 continue;
             }
@@ -138,6 +184,12 @@ public final class Main {
 
                 Lookup usage:
                   java -jar spain-reverse-geocoder.jar lookup --lat <lat> --lon <lon>
+                
+                List usage:
+                  java -jar spain-reverse-geocoder.jar list communities
+                  java -jar spain-reverse-geocoder.jar list provinces [--community <id>]
+                  java -jar spain-reverse-geocoder.jar list municipalities --province <id> [--geometry]
+                  java -jar spain-reverse-geocoder.jar list municipalities --community <id> [--geometry]
 
                 Search usage:
                   java -jar spain-reverse-geocoder.jar search --name <query>

@@ -34,10 +34,12 @@ import java.util.Set;
 public final class SpainGeo {
     private final SpainReverseGeocoder geocoder;
     private final MunicipalityIndex index;
+    private final SpainCatalog catalog;
 
-    private SpainGeo(SpainReverseGeocoder geocoder, MunicipalityIndex index) {
+    private SpainGeo(SpainReverseGeocoder geocoder, MunicipalityIndex index, SpainCatalog catalog) {
         this.geocoder = geocoder;
         this.index = index;
+        this.catalog = catalog;
     }
 
     public static Builder builder() {
@@ -85,6 +87,34 @@ public final class SpainGeo {
      */
     public List<ReverseGeocodeResult> search(String province, String municipality) {
         return index.searchByProvinceAndName(province, municipality);
+    }
+
+    /**
+     * List all autonomous communities.
+     */
+    public List<com.futesat.spaingeo.model.AdminDivision> listCommunities() {
+        return catalog.listCommunities();
+    }
+
+    /**
+     * List provinces, optionally filtered by community ID.
+     */
+    public List<com.futesat.spaingeo.model.AdminDivision> listProvinces(String communityId) {
+        return catalog.listProvinces(communityId);
+    }
+
+    /**
+     * List all municipalities in a specific province.
+     */
+    public List<ReverseGeocodeResult> listMunicipalitiesByProvince(String provinceId) {
+        return index.listByProvince(provinceId);
+    }
+
+    /**
+     * List all municipalities in a specific autonomous community.
+     */
+    public List<ReverseGeocodeResult> listMunicipalitiesByCommunity(String communityId) {
+        return index.listByCommunity(communityId);
     }
 
     /**
@@ -153,7 +183,7 @@ public final class SpainGeo {
 
             SpainReverseGeocoder geocoder = new SpainReverseGeocoder(features);
             MunicipalityIndex index = new MunicipalityIndex(features);
-            return new SpainGeo(geocoder, index);
+            return new SpainGeo(geocoder, index, catalog);
         }
     }
 }

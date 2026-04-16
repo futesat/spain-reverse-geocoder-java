@@ -126,6 +126,11 @@ List<ReverseGeocodeResult> results = geo.searchByNameContains("madri");
 // Filter by province + municipality name
 List<ReverseGeocodeResult> results = geo.search("Madrid", "Getafe");
 List<ReverseGeocodeResult> results = geo.search("28", "Getafe");  // by province code
+
+// Listing
+List<AdminDivision> communities = geo.listCommunities();
+List<AdminDivision> provinces = geo.listProvinces("13"); // Madrid
+List<ReverseGeocodeResult> municipalities = geo.listMunicipalitiesByProvince("28");
 ```
 
 ### Province Codes
@@ -140,10 +145,29 @@ Province filtering uses **2-digit INE codes**. Some common ones:
 | `15` | A Coruña | `41` | Sevilla |
 | `20` | Gipuzkoa | `46` | Valencia |
 | `48` | Bizkaia | `50` | Zaragoza |
+| `51` | Ceuta | `52` | Melilla |
 
 ---
 
 ## 🖥️ CLI Reference
+
+### `list` — Administrative Browsing
+
+List autonomous communities, provinces, and municipalities.
+
+```bash
+# List all autonomous communities
+java -jar spain-reverse-geocoder.jar list communities
+
+# List provinces in a specific community (e.g. 13 - Madrid)
+java -jar spain-reverse-geocoder.jar list provinces --community 13
+
+# List all municipalities in a province (e.g. 28 - Madrid)
+java -jar spain-reverse-geocoder.jar list municipalities --province 28
+
+# Include full GeoJSON polygons in the listing
+java -jar spain-reverse-geocoder.jar list municipalities --province 28 --geometry
+```
 
 ### `lookup` — Reverse Geocode
 

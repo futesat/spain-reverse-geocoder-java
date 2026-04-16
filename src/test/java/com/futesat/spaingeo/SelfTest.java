@@ -86,6 +86,14 @@ public final class SelfTest {
         testBuilderWithExternalFile();
         testBuilderSize();
 
+        // Administrative Listing
+        section("Administrative Listing");
+        testListCommunities();
+        testListProvinces();
+        testListMunicipalitiesByProvince();
+        testListMunicipalitiesByCommunity();
+        testResultToJsonWithoutGeometry();
+
         // Summary
         System.out.println("\n=== Results ===");
         System.out.println("Passed: " + passed);
@@ -404,5 +412,49 @@ public final class SelfTest {
                 .geoJsonPath(Path.of("src/test/resources/sample_municipalities.geojson"))
                 .build();
         assertEquals(6, geo.size(), "Builder loads all 6 municipalities from sample");
+    }
+
+    private static void testListCommunities() {
+        SpainGeo geo = SpainGeo.builder().build();
+        List<AdminDivision> communities = geo.listCommunities();
+        assertEquals(19, communities.size(), "List all communities returns 19 results");
+    }
+
+    private static void testListProvinces() {
+        SpainGeo geo = SpainGeo.builder().build();
+        List<AdminDivision> allProvinces = geo.listProvinces(null);
+        assertTrue(allProvinces.size() >= 52, "List all provinces returns at least 52 results");
+
+        List<AdminDivision> madridProvinces = geo.listProvinces("13"); // Madrid
+        assertEquals(1, madridProvinces.size(), "Madrid community has 1 province");
+        assertEquals("Madrid", madridProvinces.get(0).name(), "Province in Madrid community is Madrid");
+    }
+
+    private static void testListMunicipalitiesByProvince() {
+        SpainGeo geo = SpainGeo.builder()
+                .geoJsonPath(Path.of("src/test/resources/sample_municipalities.geojson"))
+                .build();
+        List<ReverseGeocodeResult> results = geo.listMunicipalitiesByProvince("28");
+        assertEquals(3, results.size(), "Madrid province in sample has 3 municipalities");
+    }
+
+    private static void testListMunicipalitiesByCommunity() {
+        SpainGeo geo = SpainGeo.builder()
+                .geoJsonPath(Path.of("src/test/resources/sample_municipalities.geojson"))
+                .build();
+        List<ReverseGeocodeResult> results = geo.listMunicipalitiesByCommunity("13");
+        assertEquals(3, results.size(), "Madrid community in sample has 3 municipalities");
+    }
+
+    private static void testResultToJsonWithoutGeometry() {
+        SpainGeo geo = SpainGeo.builder()
+                .geoJsonPath(Path.of("src/test/resources/sample_municipalities.geojson"))
+                .build();
+        ReverseGeocodeResult r = geo.reverse(40.4167, -3.70325);
+        String jsonWith = r.toJson(true);
+        String jsonWithout = r.toJson(false);
+
+        assertTrue(jsonWith.contains("\"geometry\": {") || jsonWith.contains("\"geometry\":{"), "JSON with geometry contains object");
+        assertTrue(jsonWithout.contains("\"geometry\": null"), "JSON without geometry has null");
     }
 }
