@@ -1,108 +1,279 @@
 package com.futesat.spaingeo.io;
 
+import java.io.IOException;
+import java.io.PushbackReader;
+import java.io.Reader;
+import java.io.StringReader;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Stack;
+import java.util.function.Consumer;
 
+/**
+ * A non-recursive JSON parser using a state machine and explicit stack.
+ * Optimized for Java 21 using Records and Pattern Matching.
+ */
 public final class MiniJsonParser {
-    private final String input;
-    private int pos;
+    private enum State { VALUE, KEY, COLON, COMMA_OR_END }
 
-    private MiniJsonParser(String input) {
-        this.input = input;
+    private final PushbackReader reader;
+    private final Stack<Object> stack = new Stack<>();
+    private final Stack<State> states = new Stack<>();
+    private final Stack<String> keys = new Stack<>();
+    private Object root = null;
+
+    private MiniJsonParser(Reader reader) {
+        this.reader = new PushbackReader(reader, 1);
     }
 
-    public static Object parse(String input) {
-        MiniJsonParser parser = new MiniJsonParser(input);
-        Object value = parser.parseValue();
-        parser.skipWhitespace();
-        if (!parser.isEnd()) {
-            throw new IllegalArgumentException("Unexpected trailing JSON at position " + parser.pos);
+    public static Object parse(String json) {
+        return parse(new StringReader(json));
+    }
+
+    public static Object parse(Reader reader) {
+        try {
+            return new MiniJsonParser(reader).parseInternal();
+        } catch (IOException e) {
+            throw new RuntimeException("JSON parse error: " + e.getMessage(), e);
         }
-        return value;
     }
 
-    private Object parseValue() {
+    /**
+     * Streams elements of a specific array within a root object.
+     * Useful for large FeatureCollections where 'features' is the bottleneck.
+     */
+    public static void streamArray(Reader reader, String targetKey, Consumer<Object> consumer) {
+        try {
+            new MiniJsonParser(reader).parseStreaming(targetKey, consumer);
+        } catch (IOException e) {
+            throw new RuntimeException("JSON stream error: " + e.getMessage(), e);
+        }
+    }
+
+    private void parseStreaming(String targetKey, Consumer<Object> consumer) throws IOException {
         skipWhitespace();
-        if (isEnd()) {
-            throw new IllegalArgumentException("Unexpected end of JSON.");
+        if (read() != '{') throw new IOException("Expected '{' at start of GeoJSON");
+
+        while (true) {
+            skipWhitespace();
+            int c = peek();
+            if (c == '}') {
+                read();
+                break;
+            }
+            String key = parseString();
+            skipWhitespace();
+            if (read() != ':') throw new IOException("Expected ':' after key");
+            skipWhitespace();
+
+            if (targetKey.equals(key)) {
+                if (peek() != '[') throw new IOException("Expected '[' for " + targetKey);
+                read(); // '['
+                skipWhitespace();
+                if (peek() == ']') {
+                    read(); // ']'
+                } else {
+                    while (true) {
+                        consumer.accept(parseValueRecursive());
+                        skipWhitespace();
+                        int next = read();
+                        if (next == ']') break;
+                        if (next != ',') throw new IOException("Expected ',' or ']' in " + targetKey);
+                    }
+                }
+            } else {
+                skipValue();
+            }
+
+            skipWhitespace();
+            int next = peek();
+            if (next == '}') {
+                read();
+                break;
+            } else if (next == ',') {
+                read();
+            } else {
+                throw new IOException("Expected ',' or '}' in root object");
+            }
         }
-        char c = peek();
+    }
+
+    private void skipValue() throws IOException {
+        int first = peek();
+        if (first == '{' || first == '[') {
+            int depth = 0;
+            while (true) {
+                int c = read();
+                if (c == -1) break;
+                if (c == '{' || c == '[') depth++;
+                else if (c == '}' || c == ']') depth--;
+                else if (c == '"') {
+                    unread(c);
+                    parseString();
+                }
+                if (depth == 0) break;
+            }
+        } else if (first == '"') {
+            parseString();
+        } else {
+            parsePrimitive();
+        }
+    }
+
+    private Object parseValueRecursive() throws IOException {
+        skipWhitespace();
+        int c = peek();
         return switch (c) {
-            case '{' -> parseObject();
-            case '[' -> parseArray();
+            case '{' -> {
+                read();
+                Map<String, Object> map = new LinkedHashMap<>();
+                skipWhitespace();
+                if (peek() == '}') { read(); yield map; }
+                while (true) {
+                    skipWhitespace();
+                    String key = parseString();
+                    skipWhitespace();
+                    if (read() != ':') throw new IOException("Expected ':'");
+                    map.put(key, parseValueRecursive());
+                    skipWhitespace();
+                    int next = read();
+                    if (next == '}') break;
+                    if (next != ',') throw new IOException("Expected ',' or '}'");
+                }
+                yield map;
+            }
+            case '[' -> {
+                read();
+                List<Object> list = new ArrayList<>();
+                skipWhitespace();
+                if (peek() == ']') { read(); yield list; }
+                while (true) {
+                    list.add(parseValueRecursive());
+                    skipWhitespace();
+                    int next = read();
+                    if (next == ']') break;
+                    if (next != ',') throw new IOException("Expected ',' or ']'");
+                }
+                yield list;
+            }
+            default -> parsePrimitive();
+        };
+    }
+
+    private Object parseInternal() throws IOException {
+        states.push(State.VALUE);
+
+        while (!states.isEmpty()) {
+            skipWhitespace();
+            State state = states.pop();
+
+            switch (state) {
+                case VALUE -> handleValue();
+                case KEY -> keys.push(parseString());
+                case COLON -> { skipWhitespace(); if (read() != ':') throw new IOException("Expected ':'"); }
+                case COMMA_OR_END -> handleCommaOrEnd();
+            }
+        }
+
+        skipWhitespace();
+        if (peek() != -1) {
+            throw new IOException("Unexpected trailing characters");
+        }
+        return root;
+    }
+
+    private void handleValue() throws IOException {
+        int c = peek();
+        switch (c) {
+            case '{' -> {
+                read();
+                Map<String, Object> map = new LinkedHashMap<>();
+                skipWhitespace();
+                if (peek() == '}') {
+                    read();
+                    emitValue(map);
+                } else {
+                    stack.push(map);
+                    states.push(State.COMMA_OR_END);
+                    states.push(State.VALUE);
+                    states.push(State.COLON);
+                    states.push(State.KEY);
+                }
+            }
+            case '[' -> {
+                read();
+                List<Object> list = new ArrayList<>();
+                skipWhitespace();
+                if (peek() == ']') {
+                    read();
+                    emitValue(list);
+                } else {
+                    stack.push(list);
+                    states.push(State.COMMA_OR_END);
+                    states.push(State.VALUE);
+                }
+            }
+            case -1 -> throw new IOException("Unexpected EOF");
+            default -> emitValue(parsePrimitive());
+        }
+    }
+
+    private void handleCommaOrEnd() throws IOException {
+        skipWhitespace();
+        int c = read();
+        Object container = stack.peek();
+        int endChar = (container instanceof Map) ? '}' : ']';
+
+        if (c == endChar) {
+            emitValue(stack.pop());
+        } else if (c == ',') {
+            states.push(State.COMMA_OR_END);
+            states.push(State.VALUE);
+            if (container instanceof Map) {
+                states.push(State.COLON);
+                states.push(State.KEY);
+            }
+        } else {
+            throw new IOException("Expected ',' or '" + (char) endChar + "'");
+        }
+    }
+
+    private void emitValue(Object value) {
+        if (stack.isEmpty()) {
+            root = value;
+        } else {
+            Object container = stack.peek();
+            if (container instanceof Map map) {
+                map.put(keys.pop(), value);
+            } else if (container instanceof List list) {
+                list.add(value);
+            }
+        }
+    }
+
+    private Object parsePrimitive() throws IOException {
+        int c = peek();
+        return switch (c) {
             case '"' -> parseString();
-            case 't' -> parseTrue();
-            case 'f' -> parseFalse();
-            case 'n' -> parseNull();
+            case 't' -> { expectLiteral("true"); yield Boolean.TRUE; }
+            case 'f' -> { expectLiteral("false"); yield Boolean.FALSE; }
+            case 'n' -> { expectLiteral("null"); yield null; }
             default -> parseNumber();
         };
     }
 
-    private Map<String, Object> parseObject() {
-        expect('{');
-        skipWhitespace();
-        Map<String, Object> object = new LinkedHashMap<>();
-        if (peek() == '}') {
-            pos++;
-            return object;
-        }
-        while (true) {
-            skipWhitespace();
-            String key = parseString();
-            skipWhitespace();
-            expect(':');
-            Object value = parseValue();
-            object.put(key, value);
-            skipWhitespace();
-            char c = next();
-            if (c == '}') {
-                break;
-            }
-            if (c != ',') {
-                throw new IllegalArgumentException("Expected ',' or '}' at position " + pos);
-            }
-        }
-        return object;
-    }
-
-    private List<Object> parseArray() {
-        expect('[');
-        skipWhitespace();
-        List<Object> array = new ArrayList<>();
-        if (peek() == ']') {
-            pos++;
-            return array;
-        }
-        while (true) {
-            array.add(parseValue());
-            skipWhitespace();
-            char c = next();
-            if (c == ']') {
-                break;
-            }
-            if (c != ',') {
-                throw new IllegalArgumentException("Expected ',' or ']' at position " + pos);
-            }
-        }
-        return array;
-    }
-
-    private String parseString() {
-        expect('"');
+    private String parseString() throws IOException {
+        if (read() != '"') throw new IOException("Expected '\"'");
         StringBuilder sb = new StringBuilder();
-        while (!isEnd()) {
-            char c = next();
-            if (c == '"') {
-                return sb.toString();
-            }
+        while (true) {
+            int c = read();
+            if (c == -1) throw new IOException("Unterminated string");
+            if (c == '"') return sb.toString();
             if (c == '\\') {
-                if (isEnd()) {
-                    throw new IllegalArgumentException("Unexpected end inside string escape.");
-                }
-                char e = next();
-                switch (e) {
+                int next = read();
+                switch (next) {
                     case '"' -> sb.append('"');
                     case '\\' -> sb.append('\\');
                     case '/' -> sb.append('/');
@@ -112,92 +283,66 @@ public final class MiniJsonParser {
                     case 'r' -> sb.append('\r');
                     case 't' -> sb.append('\t');
                     case 'u' -> {
-                        if (pos + 4 > input.length()) {
-                            throw new IllegalArgumentException("Invalid unicode escape at position " + pos);
+                        char[] hex = new char[4];
+                        for (int i = 0; i < 4; i++) {
+                            int h = read();
+                            if (h == -1) throw new IOException("Invalid unicode escape");
+                            hex[i] = (char) h;
                         }
-                        String hex = input.substring(pos, pos + 4);
-                        sb.append((char) Integer.parseInt(hex, 16));
-                        pos += 4;
+                        sb.append((char) Integer.parseInt(new String(hex), 16));
                     }
-                    default -> throw new IllegalArgumentException("Invalid escape character: " + e);
+                    default -> throw new IOException("Invalid escape");
                 }
             } else {
-                sb.append(c);
+                sb.append((char) c);
             }
         }
-        throw new IllegalArgumentException("Unterminated string.");
     }
 
-    private Boolean parseTrue() {
-        expectLiteral("true");
-        return Boolean.TRUE;
-    }
-
-    private Boolean parseFalse() {
-        expectLiteral("false");
-        return Boolean.FALSE;
-    }
-
-    private Object parseNull() {
-        expectLiteral("null");
-        return null;
-    }
-
-    private Number parseNumber() {
-        int start = pos;
-        if (peek() == '-') {
-            pos++;
+    private Number parseNumber() throws IOException {
+        StringBuilder sb = new StringBuilder();
+        while (true) {
+            int c = peek();
+            if (c == -1 || (!Character.isDigit(c) && c != '.' && c != '-' && c != '+' && c != 'e' && c != 'E')) break;
+            sb.append((char) read());
         }
-        while (!isEnd() && Character.isDigit(peek())) {
-            pos++;
-        }
-        if (!isEnd() && peek() == '.') {
-            pos++;
-            while (!isEnd() && Character.isDigit(peek())) {
-                pos++;
+        String s = sb.toString();
+        try {
+            if (s.contains(".") || s.toLowerCase().contains("e")) {
+                return Double.parseDouble(s);
+            } else {
+                return Long.parseLong(s);
             }
-        }
-        if (!isEnd() && (peek() == 'e' || peek() == 'E')) {
-            pos++;
-            if (!isEnd() && (peek() == '+' || peek() == '-')) {
-                pos++;
-            }
-            while (!isEnd() && Character.isDigit(peek())) {
-                pos++;
-            }
-        }
-        String token = input.substring(start, pos);
-        return Double.parseDouble(token);
-    }
-
-    private void skipWhitespace() {
-        while (!isEnd() && Character.isWhitespace(peek())) {
-            pos++;
+        } catch (NumberFormatException e) {
+            throw new IOException("Invalid number: " + s);
         }
     }
 
-    private void expect(char expected) {
-        if (isEnd() || next() != expected) {
-            throw new IllegalArgumentException("Expected '" + expected + "' at position " + pos);
+    private void expectLiteral(String literal) throws IOException {
+        for (int i = 0; i < literal.length(); i++) {
+            if (read() != literal.charAt(i)) throw new IOException("Expected '" + literal + "'");
         }
     }
 
-    private void expectLiteral(String literal) {
-        if (!input.startsWith(literal, pos)) {
-            throw new IllegalArgumentException("Expected '" + literal + "' at position " + pos);
+    private void skipWhitespace() throws IOException {
+        while (true) {
+            int c = peek();
+            if (c == -1 || !Character.isWhitespace(c)) break;
+            read();
         }
-        pos += literal.length();
     }
 
-    private char peek() {
-        return input.charAt(pos);
+    private int peek() throws IOException {
+        int c = reader.read();
+        if (c != -1) reader.unread(c);
+        return c;
     }
 
-    private char next() {
-        return input.charAt(pos++);
+    private int read() throws IOException {
+        return reader.read();
     }
 
-    private boolean isEnd() {
-        return pos >= input.length();
+    private void unread(int c) throws IOException {
+        if (c != -1) reader.unread(c);
     }
 }

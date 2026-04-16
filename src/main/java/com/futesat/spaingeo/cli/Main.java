@@ -5,12 +5,23 @@ import com.futesat.spaingeo.io.PropertyMappingLoader;
 import com.futesat.spaingeo.io.SpainCatalog;
 import com.futesat.spaingeo.model.ReverseGeocodeResult;
 
+import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.stream.Stream;
 
 public final class Main {
+    private static final String RESET = "\u001B[0m";
+    private static final String GREEN = "\u001B[32m";
+    private static final String YELLOW = "\u001B[33m";
+    private static final String CYAN = "\u001B[36m";
+    private static final String BOLD = "\u001B[1m";
+
     private Main() {
     }
 
@@ -26,7 +37,7 @@ public final class Main {
             SpainGeo.Builder builder = SpainGeo.builder();
 
             if (options.containsKey("--geojson")) {
-                builder.geoJsonPath(Path.of(options.get("--geojson")));
+                builder.geoJsonPath(Paths.get(options.get("--geojson")));
             }
             if (options.containsKey("--provinces")) {
                 String[] codes = options.get("--provinces").split(",");
@@ -35,10 +46,10 @@ public final class Main {
                 }
             }
             if (options.containsKey("--mapping")) {
-                builder.mapping(PropertyMappingLoader.load(Path.of(options.get("--mapping"))));
+                builder.mapping(PropertyMappingLoader.load(Paths.get(options.get("--mapping"))));
             }
             if (options.containsKey("--catalog")) {
-                builder.catalog(SpainCatalog.load(Path.of(options.get("--catalog"))));
+                builder.catalog(SpainCatalog.load(Paths.get(options.get("--catalog"))));
             }
             if (options.containsKey("--low-precision")) {
                 builder.lowPrecision(true);
@@ -50,7 +61,10 @@ public final class Main {
                 case "lookup" -> handleLookup(spainGeo, options);
                 case "search" -> handleSearch(spainGeo, options);
                 case "list" -> handleList(spainGeo, args, options);
-                default -> throw new IllegalArgumentException("Unsupported command: " + command + ". Use 'lookup', 'search', or 'list'.");
+                case "batch" -> handleBatch(spainGeo, options);
+                case "demo" -> handleDemo(spainGeo, options);
+                default -> throw new IllegalArgumentException("Unsupported command: " + command + 
+                        ". Use 'lookup', 'search', 'list', 'batch', or 'demo'.");
             }
         } catch (Exception e) {
             System.err.println("ERROR: " + e.getMessage());
@@ -77,13 +91,13 @@ public final class Main {
         String province = options.get("--province");
         boolean partial = options.containsKey("--partial");
 
-        if (name == null || name.isBlank()) {
+        if (name == null || name.trim().isEmpty()) {
             throw new IllegalArgumentException("Missing required option: --name");
         }
 
         List<ReverseGeocodeResult> results;
 
-        if (province != null && !province.isBlank()) {
+        if (province != null && !province.trim().isEmpty()) {
             results = spainGeo.search(province, name);
         } else if (partial) {
             results = spainGeo.searchByNameContains(name);
@@ -91,57 +105,93 @@ public final class Main {
             results = spainGeo.searchByName(name);
         }
 
-        System.out.println("[");
-        for (int i = 0; i < results.size(); i++) {
-            System.out.print(results.get(i).toJson());
-            if (i < results.size() - 1) {
-                System.out.print(",");
+        printResults(results);
+    }
+
+    private static void handleBatch(SpainGeo spainGeo, Map<String, String> options) throws IOException {
+        String inPath = options.get("--in");
+        if (inPath == null) throw new IllegalArgumentException("Missing --in <path>");
+        
+        Path path = Paths.get(inPath);
+        if (!Files.exists(path)) throw new IllegalArgumentException("File not found: " + inPath);
+
+        System.out.println(BOLD + "Processing batch: " + YELLOW + inPath + RESET);
+        
+        try (Stream<String> lines = Files.lines(path)) {
+            List<String> results = lines
+                .filter(line -> !line.trim().isEmpty())
+                .map(line -> {
+                    String[] parts = line.split("[,; \t]");
+                    if (parts.length < 2) return null;
+                    try {
+                        double lat = Double.parseDouble(parts[0].trim());
+                        double lon = Double.parseDouble(parts[1].trim());
+                        ReverseGeocodeResult res = spainGeo.reverse(lat, lon);
+                        return res != null ? res.toJson() : null;
+                    } catch (NumberFormatException e) {
+                        return null;
+                    }
+                })
+                .filter(Objects::nonNull)
+                .toList();
+                
+            printJsonList(results);
+            System.out.println(GREEN + "✓ Processed " + results.size() + " matches." + RESET);
+        }
+    }
+
+    private static void handleDemo(SpainGeo spainGeo, Map<String, String> options) throws IOException {
+        int port = options.containsKey("--port") ? Integer.parseInt(options.get("--port")) : 8080;
+        com.futesat.spaingeo.demo.DemoServer server = new com.futesat.spaingeo.demo.DemoServer(spainGeo, port);
+        server.start();
+        
+        System.out.println(BOLD + CYAN + "Press Ctrl+C to stop the server." + RESET);
+        while (true) {
+            try {
+                Thread.sleep(1000);
+            } catch (InterruptedException e) {
+                break;
             }
         }
-        System.out.println("]");
     }
 
     private static void handleList(SpainGeo spainGeo, String[] args, Map<String, String> options) {
         if (args.length < 2) {
-            throw new IllegalArgumentException("Missing subcommand for 'list'. Use 'communities', 'provinces', or 'municipalities'.");
+            throw new IllegalArgumentException("Missing list subcommand (communities, provinces, municipalities)");
         }
         String sub = args[1];
         boolean geometry = options.containsKey("--geometry");
 
         switch (sub) {
-            case "communities" -> {
-                printList(spainGeo.listCommunities().stream().map(com.futesat.spaingeo.model.AdminDivision::toJson).toList());
-            }
+            case "communities" -> printJsonList(spainGeo.listCommunities().stream()
+                    .map(com.futesat.spaingeo.model.AdminDivision::toJson).toList());
             case "provinces" -> {
                 String communityId = options.get("--community");
-                printList(spainGeo.listProvinces(communityId).stream().map(com.futesat.spaingeo.model.AdminDivision::toJson).toList());
+                printJsonList(spainGeo.listProvinces(communityId).stream()
+                        .map(com.futesat.spaingeo.model.AdminDivision::toJson).toList());
             }
             case "municipalities" -> {
-                String provinceId = options.get("--province");
-                String communityId = options.get("--community");
-                List<ReverseGeocodeResult> results;
-                if (provinceId != null) {
-                    results = spainGeo.listMunicipalitiesByProvince(provinceId);
-                } else if (communityId != null) {
-                    results = spainGeo.listMunicipalitiesByCommunity(communityId);
-                } else {
-                    throw new IllegalArgumentException("Missing --province or --community filter for 'list municipalities'.");
-                }
-                printList(results.stream().map(r -> r.toJson(geometry)).toList());
+                String pId = options.get("--province");
+                String cId = options.get("--community");
+                List<ReverseGeocodeResult> res = pId != null ? spainGeo.listMunicipalitiesByProvince(pId) 
+                        : spainGeo.listMunicipalitiesByCommunity(cId);
+                if (res == null) throw new IllegalArgumentException("Filter required");
+                printJsonList(res.stream().map(r -> r.toJson(geometry)).toList());
             }
-            default -> throw new IllegalArgumentException("Unsupported list subcommand: " + sub);
+            default -> throw new IllegalArgumentException("Unknown list: " + sub);
         }
     }
 
-    private static void printList(List<String> items) {
+    private static void printResults(List<ReverseGeocodeResult> results) {
+        printJsonList(results.stream().map(ReverseGeocodeResult::toJson).toList());
+    }
+
+    private static void printJsonList(List<String> items) {
         System.out.println("[");
         for (int i = 0; i < items.size(); i++) {
             System.out.print(items.get(i));
-            if (i < items.size() - 1) {
-                System.out.println(",");
-            } else {
-                System.out.println();
-            }
+            if (i < items.size() - 1) System.out.println(",");
+            else System.out.println();
         }
         System.out.println("]");
     }
@@ -150,58 +200,31 @@ public final class Main {
         Map<String, String> options = new HashMap<>();
         for (int i = startIndex; i < args.length; i++) {
             String arg = args[i];
-            if (!arg.startsWith("--")) {
-                throw new IllegalArgumentException("Expected option starting with --, got: " + arg);
-            }
-            // Boolean flags (no value)
-            if ("--partial".equals(arg) || "--low-precision".equals(arg) || "--geometry".equals(arg)) {
+            if (!arg.startsWith("--")) throw new IllegalArgumentException("Invalid option: " + arg);
+            if (arg.equals("--partial") || arg.equals("--low-precision") || arg.equals("--geometry")) {
                 options.put(arg, "true");
                 continue;
             }
-            if (i + 1 >= args.length) {
-                throw new IllegalArgumentException("Missing value for option: " + arg);
-            }
+            if (i + 1 >= args.length) throw new IllegalArgumentException("Missing value for " + arg);
             options.put(arg, args[++i]);
         }
         return options;
     }
 
     private static double requiredDouble(Map<String, String> options, String key) {
-        String value = options.get(key);
-        if (value == null || value.isBlank()) {
-            throw new IllegalArgumentException("Missing required option: " + key);
-        }
-        return Double.parseDouble(value);
+        String val = options.get(key);
+        if (val == null) throw new IllegalArgumentException("Missing " + key);
+        return Double.parseDouble(val);
     }
 
     private static void printHelp() {
-        System.out.println("""
-                Spain Reverse Geocoder (offline, exact polygons)
-
-                Commands:
-                  lookup    Reverse geocode a coordinate to a municipality
-                  search    Search municipalities by name
-
-                Lookup usage:
-                  java -jar spain-reverse-geocoder.jar lookup --lat <lat> --lon <lon>
-                
-                List usage:
-                  java -jar spain-reverse-geocoder.jar list communities
-                  java -jar spain-reverse-geocoder.jar list provinces [--community <id>]
-                  java -jar spain-reverse-geocoder.jar list municipalities --province <id> [--geometry]
-                  java -jar spain-reverse-geocoder.jar list municipalities --community <id> [--geometry]
-
-                Search usage:
-                  java -jar spain-reverse-geocoder.jar search --name <query>
-                  java -jar spain-reverse-geocoder.jar search --name <query> --partial
-                  java -jar spain-reverse-geocoder.jar search --province <province> --name <query>
-
-                Common options:
-                  --geojson <path>     Path to GeoJSON file (optional, uses embedded default)
-                  --provinces <ids>    Comma-separated province codes to filter (e.g. 28,08)
-                  --mapping <path>     Path to property mapping JSON
-                  --catalog <path>     Path to administrative catalog JSON
-                  --low-precision      Use low-precision GeoJSON (~75MB vs ~90MB)
-                """);
+        System.out.println(CYAN + BOLD + "Spain Reverse Geocoder (Java 21 Edition)" + RESET + "\n" +
+                "\n" +
+                BOLD + "Commands:" + RESET + "\n" +
+                "  lookup --lat <lat> --lon <lon>   Reverse lookup\n" +
+                "  search --name <query> [--partial] Search municipality\n" +
+                "  batch  --in <file>              Process CSV\n" +
+                "  demo   [--port 8080]             Interactive map\n" +
+                "  list   communities/provinces/municipalities\n");
     }
 }

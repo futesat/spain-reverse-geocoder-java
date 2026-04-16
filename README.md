@@ -17,14 +17,16 @@ Given coordinates → returns the **municipality**, **province**, **autonomous c
 |---|---|
 | **Reverse Geocoding** | Exact point-in-polygon lookup using a quadtree spatial index |
 | **Municipality Search** | Find municipalities by name (exact or partial), accent & case insensitive |
-| **Province + Name Search** | Filter by province (name or INE code) then search municipality |
-| **Province Filtering** | Load only specific provinces to optimize memory |
+| **Streaming Parser** | Iterative, non-recursive JSON parser (no `StackOverflowError`) |
+| **Virtual Threads** | High-performance Demo Server scaling via **Java 21 Virtual Threads** |
+| **Batch Processing** | Bulk reverse geocode coordinates from CSV/text files |
+| **Web Demo** | Integrated interactive map for visual geocoding and search |
 | **Embedded Data** | ~92 MB GeoJSON with all 8,131 Spanish municipalities bundled in the JAR |
-| **Library API** | Clean builder-pattern API for use as a dependency in other Java projects |
-| **CLI Tool** | Command-line interface for `lookup` and `search` operations |
-| **Geometry Output** | Returns the full municipality polygon as GeoJSON in results |
-| **Low Precision Mode** | Option to use ~75MB GeoJSON (vs ~90MB) to save memory/space |
-| **Zero Dependencies** | Pure Java 21 — no Maven, no Gradle, no external libraries |
+| **Library API** | Clean builder-pattern API using **Java 21 Records** |
+| **CLI Tool** | Advanced command-line interface for all operations |
+| **Geometry Output** | Returns full municipality polygons as GeoJSON |
+| **Low Precision Mode** | Option to use ~75MB GeoJSON to save space |
+| **Zero Dependencies** | Pure Java 21 — no external libraries or build tools required |
 
 ---
 
@@ -55,7 +57,27 @@ java -jar spain-reverse-geocoder.jar lookup --lat 40.4167 --lon -3.70325
 
 # Search by name
 java -jar spain-reverse-geocoder.jar search --name "Madrid"
+
+# Launch web demo (Scalable via Virtual Threads)
+java -jar spain-reverse-geocoder.jar demo
 ```
+
+---
+
+## 🌐 Interactive Web Demo
+
+The project includes a built-in, zero-dependency web server optimized for Java 21.
+
+```bash
+java -jar spain-reverse-geocoder.jar demo [--port 8080]
+```
+
+Features:
+- **Click-to-Geocode**: Click anywhere on the map to find the municipality.
+- **Search Bar**: Search municipalities by name with real-time suggestions.
+- **Visual Highlight**: Shows exact borders (polygon) of the selected municipality.
+- **Scalable**: Uses **Java 21 Virtual Threads** to handle many concurrent users with minimal overhead.
+- **Offline**: Port 8080 by default, no external API keys required.
 
 ---
 
@@ -200,6 +222,22 @@ java -jar spain-reverse-geocoder.jar search --name "madri" --partial
 java -jar spain-reverse-geocoder.jar search --province "Madrid" --name "Getafe"
 ```
 
+### `batch` — Bulk Processing
+
+Efficiently process multiple coordinates from a file.
+
+```bash
+java -jar spain-reverse-geocoder.jar batch --in points.csv
+```
+
+### `demo` — Web Interface
+
+Launch the interactive map.
+
+```bash
+java -jar spain-reverse-geocoder.jar demo [--port 8080]
+```
+
 ### Common Options
 
 | Option | Description |
@@ -218,7 +256,9 @@ java -jar spain-reverse-geocoder.jar search --province "Madrid" --name "Getafe"
 src/main/java/com/futesat/spaingeo/
 ├── SpainGeo.java                    # Public library API (builder pattern)
 ├── cli/
-│   └── Main.java                    # CLI entry point (lookup + search)
+│   └── Main.java                    # CLI entry point (lookup + search + demo)
+├── demo/
+│   └── DemoServer.java              # Virtual thread-based HTTP server
 ├── core/
 │   ├── SpainReverseGeocoder.java    # Reverse geocoding engine
 │   ├── QuadtreeSpatialIndex.java    # Quadtree spatial index
