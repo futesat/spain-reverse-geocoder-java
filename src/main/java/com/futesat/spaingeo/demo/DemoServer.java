@@ -75,7 +75,7 @@ public final class DemoServer {
                 double lat = Double.parseDouble(latStr);
                 double lon = Double.parseDouble(lonStr);
                 ReverseGeocodeResult result = spainGeo.reverse(lat, lon);
-                System.out.println("Geocoding [" + lat + ", " + lon + "] -> " + (result != null ? result.getMunicipality().getName() : "null"));
+                System.out.println("Geocoding [" + lat + ", " + lon + "] -> " + (result != null ? result.municipality().name() : "null"));
 
                 String json = result != null ? result.toJson() : "{\"result\":null}";
                 byte[] response = json.getBytes(StandardCharsets.UTF_8);
