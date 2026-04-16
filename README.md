@@ -87,7 +87,7 @@ SpainGeo geo = SpainGeo.builder()
 
 // Use your own GeoJSON file
 SpainGeo geo = SpainGeo.builder()
-    .geoJsonPath(Path.of("/path/to/municipalities.geojson"))
+    .geoJsonPath(java.nio.file.Paths.get("/path/to/municipalities.geojson"))
     .build();
 
 // Use low-precision mode (saves ~15MB JAR space and memory)

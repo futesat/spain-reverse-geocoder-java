@@ -121,7 +121,7 @@ public final class SelfTest {
 
     private static List<MunicipalityFeature> loadFeatures() {
         return GeoJsonLoader.load(
-                Path.of("src/test/resources/sample_municipalities.geojson"),
+                Paths.get("src/test/resources/sample_municipalities.geojson"),
                 PropertyMapping.defaultMapping(),
                 SpainCatalog.loadDefault()
         );
@@ -214,7 +214,7 @@ public final class SelfTest {
 
     private static void testPolygonHoleInside() {
         List<MunicipalityFeature> features = GeoJsonLoader.load(
-                Path.of("src/test/resources/polygon_with_hole.geojson"),
+                Paths.get("src/test/resources/polygon_with_hole.geojson"),
                 PropertyMapping.defaultMapping(),
                 SpainCatalog.loadDefault()
         );
@@ -224,7 +224,7 @@ public final class SelfTest {
 
     private static void testPolygonHoleOutside() {
         List<MunicipalityFeature> features = GeoJsonLoader.load(
-                Path.of("src/test/resources/polygon_with_hole.geojson"),
+                Paths.get("src/test/resources/polygon_with_hole.geojson"),
                 PropertyMapping.defaultMapping(),
                 SpainCatalog.loadDefault()
         );
@@ -236,7 +236,7 @@ public final class SelfTest {
 
     private static void testProvinceFilter() {
         List<MunicipalityFeature> features = GeoJsonLoader.load(
-                Path.of("src/test/resources/sample_municipalities.geojson"),
+                Paths.get("src/test/resources/sample_municipalities.geojson"),
                 PropertyMapping.defaultMapping(),
                 SpainCatalog.loadDefault(),
                 new HashSet<>(Arrays.asList("28"))
@@ -247,7 +247,7 @@ public final class SelfTest {
 
     private static void testProvinceFilterExclusion() {
         List<MunicipalityFeature> features = GeoJsonLoader.load(
-                Path.of("src/test/resources/sample_municipalities.geojson"),
+                Paths.get("src/test/resources/sample_municipalities.geojson"),
                 PropertyMapping.defaultMapping(),
                 SpainCatalog.loadDefault(),
                 new HashSet<>(Arrays.asList("28"))
@@ -404,7 +404,7 @@ public final class SelfTest {
 
     private static void testBuilderWithExternalFile() {
         SpainGeo geo = SpainGeo.builder()
-                .geoJsonPath(Path.of("src/test/resources/sample_municipalities.geojson"))
+                .geoJsonPath(Paths.get("src/test/resources/sample_municipalities.geojson"))
                 .build();
         ReverseGeocodeResult r = geo.reverse(40.4167, -3.70325);
         assertEquals("28079", r.municipality().id(), "Builder with external file lookup works");
@@ -412,7 +412,7 @@ public final class SelfTest {
 
     private static void testBuilderSize() {
         SpainGeo geo = SpainGeo.builder()
-                .geoJsonPath(Path.of("src/test/resources/sample_municipalities.geojson"))
+                .geoJsonPath(Paths.get("src/test/resources/sample_municipalities.geojson"))
                 .build();
         assertEquals(6, geo.size(), "Builder loads all 6 municipalities from sample");
     }
@@ -435,7 +435,7 @@ public final class SelfTest {
 
     private static void testListMunicipalitiesByProvince() {
         SpainGeo geo = SpainGeo.builder()
-                .geoJsonPath(Path.of("src/test/resources/sample_municipalities.geojson"))
+                .geoJsonPath(Paths.get("src/test/resources/sample_municipalities.geojson"))
                 .build();
         List<ReverseGeocodeResult> results = geo.listMunicipalitiesByProvince("28");
         assertEquals(3, results.size(), "Madrid province in sample has 3 municipalities");
@@ -443,7 +443,7 @@ public final class SelfTest {
 
     private static void testListMunicipalitiesByCommunity() {
         SpainGeo geo = SpainGeo.builder()
-                .geoJsonPath(Path.of("src/test/resources/sample_municipalities.geojson"))
+                .geoJsonPath(Paths.get("src/test/resources/sample_municipalities.geojson"))
                 .build();
         List<ReverseGeocodeResult> results = geo.listMunicipalitiesByCommunity("13");
         assertEquals(3, results.size(), "Madrid community in sample has 3 municipalities");
@@ -451,7 +451,7 @@ public final class SelfTest {
 
     private static void testResultToJsonWithoutGeometry() {
         SpainGeo geo = SpainGeo.builder()
-                .geoJsonPath(Path.of("src/test/resources/sample_municipalities.geojson"))
+                .geoJsonPath(Paths.get("src/test/resources/sample_municipalities.geojson"))
                 .build();
         ReverseGeocodeResult r = geo.reverse(40.4167, -3.70325);
         String jsonWith = r.toJson(true);
