@@ -19,6 +19,6 @@ cat > "$BUILD_DIR/manifest.txt" <<MANIFEST
 Main-Class: com.futesat.spaingeo.cli.Main
 MANIFEST
 
-jar --create --file "$JAR_FILE" --manifest "$BUILD_DIR/manifest.txt" -C "$CLASSES_DIR" .
+jar cfm "$JAR_FILE" "$BUILD_DIR/manifest.txt" -C "$CLASSES_DIR" .
 
 echo "Built: $JAR_FILE"
