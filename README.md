@@ -354,4 +354,4 @@ GitHub Actions automatically builds and tests on every push to `main` and on pul
 
 ## 📄 License
 
-MIT
+This project is licensed under the MIT License - see the [LICENSE.md](LICENSE.md) file for details.
